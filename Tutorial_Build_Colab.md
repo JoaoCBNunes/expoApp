@@ -27,12 +27,12 @@ Mas você não precisa se preocupar em criar ou subir chaves privadas se o seu o
 ## Passo a Passo no Colab
 
 ### 1. Preparação do Ambiente Android (SDK e Java)
-Em uma célula do Colab, você executa a instalação do SDK. O seu script funciona perfeitamente para preparar o terreno.
+Em uma célula do Colab, você executa a instalação do SDK. O seu script funciona perfeitamente para preparar o terreno. Nós adicionamos a instalação do `ninja-build` e `cmake` que são vitais para o React Native compilar módulos nativos em C++.
 
 ```bash
 %%bash
-# 1. Atualizar pacotes e instalar o Java 17 e unzip
-apt-get update -qq && apt-get install -y openjdk-17-jdk wget unzip -qq > /dev/null
+# 1. Atualizar pacotes e instalar o Java 17, unzip, cmake e ninja-build
+apt-get update -qq && apt-get install -y openjdk-17-jdk wget unzip cmake ninja-build -qq > /dev/null
 
 # 2. Criar diretório para o SDK
 export ANDROID_HOME=/opt/android-sdk
@@ -114,7 +114,7 @@ chmod +x gradlew
 
 # 3. Compilar em modo Release injetando a chave temporária
 ./gradlew assembleRelease \
-  -Pandroid.injected.signing.store.file=temp.keystore \
+  -Pandroid.injected.signing.store.file=$PROJECT_DIR/android/temp.keystore \
   -Pandroid.injected.signing.store.password=123456 \
   -Pandroid.injected.signing.key.alias=temp-key-alias \
   -Pandroid.injected.signing.key.password=123456
