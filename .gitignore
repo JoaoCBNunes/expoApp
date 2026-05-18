@@ -1,0 +1,119 @@
+# ==============================================================================
+# GitIgnore - Melhores Práticas para Projetos React Native & Expo (v54+)
+# ==============================================================================
+
+# --- Dependências ---
+# Nunca comite a pasta node_modules pois ela pode ser facilmente restaurada.
+node_modules/
+.pnpm-store/
+
+# --- Expo e Metro ---
+# Arquivos de cache, builds temporários e definições locais gerados pelo Metro e Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+*.tsbuildinfo
+
+# --- Geração Contínua de Nativos (CNG) ---
+# No Expo moderno (v54), as pastas nativas /ios e /android são geradas dinamicamente
+# com o comando 'npx expo prebuild' baseado no app.json/app.config.js.
+# Recomenda-se ignorá-las para manter o projeto limpo e evitar conflitos.
+/ios
+/android
+
+# --- Caso as pastas nativas sejam commitadas (Projetos Bare/Customizados) ---
+# Se em algum momento você decidir remover /ios e /android do ignore,
+# as regras abaixo garantirão que arquivos locais e temporários do Xcode/Android Studio fiquem de fora.
+# Android Nativo
+.gradle/
+build/
+local.properties
+*.iml
+.idea/workspace.xml
+.idea/libraries/
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/caches/
+.idea/jsTrigger.xml
+captures/
+# Xcode Nativo
+*.xcworkspace
+/*/xcshareddata/WorkspaceSettings.xcsettings
+/*/xsuserdata
+/*.xcuserstate
+/*.xcodeproj/xcuserdata/
+/*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+build-Xcode/
+*.orig.*
+.kotlin/
+
+# --- Certificados, Chaves e Credenciais (Segurança Máxima) ---
+# NUNCA comite arquivos de assinatura de chaves privadas, certificados ou keystores.
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*.der
+
+# --- Variáveis de Ambiente e Segredos ---
+# Bloqueia arquivos .env contendo segredos de produção e de API locais.
+# É uma boa prática deixar apenas um arquivo de exemplo (ex: .env.example) versionado no Git.
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+secrets.json
+
+# --- Artefatos de Build Nativos ---
+# Evita comitar builds compilados que ocupam muito espaço e não devem ser versionados.
+*.apk
+*.apks
+*.aab
+*.ipa
+*.dmg
+*.zip
+*.tar.gz
+
+# --- Logs e Depuração ---
+# Arquivos de log gerados por erros de execução ou ferramentas de pacotes
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.*
+*.log
+.eslintcache
+
+# --- Testes e Cobertura ---
+coverage/
+.nyc_output/
+
+# --- Configurações de IDEs e Editores ---
+# Evita salvar configurações pessoais de editores que podem divergir entre desenvolvedores.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Arquivos Temporários de Sistema ---
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
