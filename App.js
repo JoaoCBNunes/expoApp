@@ -15,7 +15,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { getVideoInfoAsync } from 'expo-video-metadata';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'expo-dev-client';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 const BITRATE_STORAGE_KEY = '@video_bitrate';
@@ -148,8 +148,8 @@ export default function App() {
       const bitrateSource = libraryBitrate
         ? 'metadata'
         : calculatedBitrate
-        ? 'calculado (tamanho ÷ duração)'
-        : 'indisponível';
+          ? 'calculado (tamanho ÷ duração)'
+          : 'indisponível';
 
       setVideoInfo({ ...info, resolvedBitrateStr, bitrateSource });
 
@@ -402,11 +402,10 @@ echo "🎉 Transcodificação concluída com sucesso!"
 echo "💾 Arquivo gerado: $OUTPUT_FILE"
 `;
 
-              const fileUri = `${FileSystem.cacheDirectory}convert_${baseName}.sh`;
+              const file = new File(Paths.cache, `convert_${baseName}.sh`);
+              file.write(scriptContent);
 
-              await FileSystem.writeAsStringAsync(fileUri, scriptContent, {
-                encoding: FileSystem.EncodingType.UTF8,
-              });
+              const fileUri = file.uri;
 
               const isSharingAvailable = await Sharing.isAvailableAsync();
               if (isSharingAvailable) {
