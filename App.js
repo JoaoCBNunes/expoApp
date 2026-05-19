@@ -9,11 +9,14 @@ import {
   ActivityIndicator,
   Alert,
   Clipboard,
+  TextInput,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { getVideoInfoAsync } from 'expo-video-metadata';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'expo-dev-client';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const BITRATE_STORAGE_KEY = '@video_bitrate';
 
@@ -87,6 +90,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [savedBitrate, setSavedBitrate] = useState(null);
   const [copiedCmd, setCopiedCmd] = useState(null); // 'pass1' | 'pass2' | null
+  const [basePath, setBasePath] = useState('/sdcard/Download/');
 
   // Load previously saved bitrate on mount
   useEffect(() => {
@@ -178,6 +182,21 @@ export default function App() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Base Path Input */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>📂 Caminho Base (FFmpeg)</Text>
+          <Text style={styles.pathHint}>Diretório onde o vídeo está localizado no terminal</Text>
+          <TextInput
+            style={styles.pathInput}
+            value={basePath}
+            onChangeText={setBasePath}
+            placeholder="/sdcard/Download/"
+            placeholderTextColor="#3a5a7a"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
         {/* File Picker Section */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📁 Selecionar Vídeo</Text>
@@ -317,7 +336,7 @@ export default function App() {
         {videoInfo && selectedFile && (() => {
           const kbps = extractKbps(videoInfo.resolvedBitrateStr);
           const baseName = stripExtension(selectedFile.name);
-          const filePath = selectedFile.name; // using filename as path (Android)
+          const filePath = `${basePath}${selectedFile.name}`;
           if (!kbps) return null;
 
           const pass1 = `ffmpeg -y -i ${filePath} -c:v libx264 -b:v ${kbps}k -pass 1 -an -f null /dev/null`;
@@ -327,6 +346,82 @@ export default function App() {
             Clipboard.setString(text);
             setCopiedCmd(key);
             setTimeout(() => setCopiedCmd(null), 2000);
+          };
+
+          const generateBashScript = async () => {
+            try {
+              const scriptContent = `#!/bin/bash
+# ==============================================================================
+# Script de conversão de 2-passagens FFmpeg (libx264)
+# Gerado automaticamente pelo aplicativo Video Info
+# ==============================================================================
+
+# Nome do arquivo de vídeo selecionado
+VIDEO_FILE="${filePath}"
+BITRATE="${kbps}k"
+OUTPUT_FILE="h264_${baseName}.mp4"
+
+# Verifica se o ffmpeg está disponível no PATH
+if ! command -v ffmpeg &> /dev/null; then
+    echo "❌ Erro: ffmpeg não está instalado ou não foi encontrado no PATH."
+    echo "Por favor, instale o ffmpeg e tente novamente."
+    exit 1
+fi
+
+echo "🎬 Iniciando processo de transcodificação para $VIDEO_FILE..."
+echo "⚙️ Configuração: libx264, Bitrate: $BITRATE"
+echo ""
+
+# Executando a Passagem 1
+echo "⏳ [1/2] Executando PASSAGEM 1..."
+ffmpeg -y -i "$VIDEO_FILE" -c:v libx264 -b:v "$BITRATE" -pass 1 -an -f null /dev/null
+
+if [ $? -ne 0 ]; then
+    echo "❌ Ocorreu um erro na passagem 1. Abortando."
+    exit 1
+fi
+
+echo "✅ PASSAGEM 1 concluída com sucesso!"
+echo ""
+
+# Executando a Passagem 2
+echo "⏳ [2/2] Executando PASSAGEM 2..."
+ffmpeg -i "$VIDEO_FILE" -c:v libx264 -b:v "$BITRATE" -pass 2 -c:a copy "$OUTPUT_FILE"
+
+if [ $? -ne 0 ]; then
+    echo "❌ Ocorreu um erro na passagem 2. Abortando."
+    exit 1
+fi
+
+# Limpando os arquivos de log gerados pelo x264 de 2-pass
+echo "🧹 Limpando arquivos de log temporários..."
+rm -f ffmpeg2pass-0.log ffmpeg2pass-0.log.mbtree x264_2pass.log x264_2pass.log.mbtree
+
+echo ""
+echo "🎉 Transcodificação concluída com sucesso!"
+echo "💾 Arquivo gerado: $OUTPUT_FILE"
+`;
+
+              const fileUri = `${FileSystem.cacheDirectory}convert_${baseName}.sh`;
+
+              await FileSystem.writeAsStringAsync(fileUri, scriptContent, {
+                encoding: FileSystem.EncodingType.UTF8,
+              });
+
+              const isSharingAvailable = await Sharing.isAvailableAsync();
+              if (isSharingAvailable) {
+                await Sharing.shareAsync(fileUri, {
+                  mimeType: 'text/plain',
+                  dialogTitle: 'Salvar Script Bash (.sh)',
+                  UTI: 'public.shell-script',
+                });
+              } else {
+                Alert.alert('Erro', 'O compartilhamento não está disponível neste dispositivo.');
+              }
+            } catch (err) {
+              Alert.alert('Erro', 'Não foi possível gerar o script Bash.');
+              console.error(err);
+            }
           };
 
           return (
@@ -379,6 +474,15 @@ export default function App() {
                   <Text style={styles.cmdText} selectable>{pass2}</Text>
                 </View>
               </View>
+
+              {/* Generate Bash Button */}
+              <TouchableOpacity
+                style={styles.generateBtn}
+                onPress={generateBashScript}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.generateBtnText}>⚙️ Gerar Script Bash (.sh)</Text>
+              </TouchableOpacity>
             </View>
           );
         })()}
@@ -648,5 +752,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
     lineHeight: 20,
+  },
+  generateBtn: {
+    backgroundColor: '#ff9800',
+    marginTop: 18,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e68a00',
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  generateBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+  // Base Path Input
+  pathHint: {
+    color: '#5a7aa5',
+    fontSize: 11,
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
+  pathInput: {
+    backgroundColor: '#0a0f1a',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1e2d4a',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#e0e8f5',
+    fontSize: 14,
+    fontFamily: 'monospace',
   },
 });
