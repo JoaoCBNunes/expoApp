@@ -42,10 +42,23 @@ function formatFileSize(bytes) {
 }
 
 /**
- * Converts bitRate from bits/s to kb/s like ffmpeg
+ * Converts bitRate from bits/s to kb/s like ffmpeg.
+ * Returns null if the value is invalid.
  */
 function formatBitrate(bitsPerSecond) {
+  if (!bitsPerSecond || !isFinite(bitsPerSecond) || bitsPerSecond <= 0) return null;
   return `${Math.round(bitsPerSecond / 1000)} kb/s`;
+}
+
+/**
+ * Calculates bitrate in bits/s from file size and duration.
+ * Used as a fallback when expo-video-metadata returns NaN.
+ * Formula: bitrate = (fileSize bytes × 8 bits) / duration seconds
+ */
+function calcBitrateFromSizeAndDuration(fileSizeBytes, durationSeconds) {
+  if (!fileSizeBytes || fileSizeBytes <= 0) return null;
+  if (!durationSeconds || durationSeconds <= 0) return null;
+  return (fileSizeBytes * 8) / durationSeconds;
 }
 
 export default function App() {
@@ -99,12 +112,27 @@ export default function App() {
     setLoading(true);
     try {
       const info = await getVideoInfoAsync(selectedFile.uri);
-      setVideoInfo(info);
 
-      // Save bitrate persistently
-      const bitrateStr = formatBitrate(info.bitRate);
-      await AsyncStorage.setItem(BITRATE_STORAGE_KEY, bitrateStr);
-      setSavedBitrate(bitrateStr);
+      // Resolve bitrate: prefer the value from the library, fall back to
+      // calculating it from file size × 8 / duration (standard ffmpeg method).
+      const libraryBitrate = formatBitrate(info.bitRate);
+      const calculatedBitrate = formatBitrate(
+        calcBitrateFromSizeAndDuration(info.fileSize, info.duration)
+      );
+      const resolvedBitrateStr = libraryBitrate ?? calculatedBitrate ?? 'N/A';
+      const bitrateSource = libraryBitrate
+        ? 'metadata'
+        : calculatedBitrate
+        ? 'calculado (tamanho ÷ duração)'
+        : 'indisponível';
+
+      setVideoInfo({ ...info, resolvedBitrateStr, bitrateSource });
+
+      // Save bitrate persistently (only if we have a real value)
+      if (resolvedBitrateStr !== 'N/A') {
+        await AsyncStorage.setItem(BITRATE_STORAGE_KEY, resolvedBitrateStr);
+        setSavedBitrate(resolvedBitrateStr);
+      }
     } catch (err) {
       Alert.alert('Erro', 'Não foi possível obter informações do vídeo.');
       console.error('Erro ao obter metadados:', err);
@@ -193,12 +221,19 @@ export default function App() {
 
               {/* Duration/Bitrate line */}
               <Text style={[styles.terminalLine, styles.terminalHighlight]}>
-                Duration: {formatDuration(videoInfo.duration)}, bitrate: {formatBitrate(videoInfo.bitRate)}
+                Duration: {formatDuration(videoInfo.duration)}, bitrate: {videoInfo.resolvedBitrateStr}
               </Text>
+
+              {/* Bitrate source note */}
+              {videoInfo.bitrateSource !== 'metadata' && (
+                <Text style={[styles.terminalLine, styles.terminalMuted]}>
+                  {'  '}(bitrate {videoInfo.bitrateSource})
+                </Text>
+              )}
 
               {/* Video Stream */}
               <Text style={[styles.terminalLine, styles.terminalStream]}>
-                Stream #0:0: Video: {videoInfo.codec || 'N/A'}, {videoInfo.width}x{videoInfo.height}, {formatBitrate(videoInfo.bitRate)}, {videoInfo.fps?.toFixed(0) || '?'} fps ({videoInfo.orientation})
+                Stream #0:0: Video: {videoInfo.codec || 'N/A'}, {videoInfo.width}x{videoInfo.height}, {videoInfo.resolvedBitrateStr}, {videoInfo.fps?.toFixed(0) || '?'} fps ({videoInfo.orientation})
               </Text>
 
               {/* Audio Stream */}
@@ -230,7 +265,12 @@ export default function App() {
               </View>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Bitrate</Text>
-                <Text style={[styles.infoValue, styles.bitrateValue]}>{formatBitrate(videoInfo.bitRate)}</Text>
+                <Text style={[styles.infoValue, styles.bitrateValue]}>
+                  {videoInfo.resolvedBitrateStr}
+                </Text>
+                {videoInfo.bitrateSource !== 'metadata' && (
+                  <Text style={styles.bitrateSourceLabel}>{videoInfo.bitrateSource}</Text>
+                )}
               </View>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Codec</Text>
@@ -433,6 +473,12 @@ const styles = StyleSheet.create({
   },
   bitrateValue: {
     color: '#ffd54f',
+  },
+  bitrateSourceLabel: {
+    color: '#8a6a00',
+    fontSize: 10,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
 
   // Saved Bitrate
