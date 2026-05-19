@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Clipboard,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { getVideoInfoAsync } from 'expo-video-metadata';
@@ -61,11 +62,31 @@ function calcBitrateFromSizeAndDuration(fileSizeBytes, durationSeconds) {
   return (fileSizeBytes * 8) / durationSeconds;
 }
 
+/**
+ * Extracts the numeric kbps value from a bitrate string like "3050 kb/s".
+ * Returns the number string (e.g. "3050") or null.
+ */
+function extractKbps(bitrateStr) {
+  if (!bitrateStr || bitrateStr === 'N/A') return null;
+  const match = bitrateStr.match(/(\d+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Strips the extension from a filename.
+ * e.g. "seu_video_vp9.mp4" → "seu_video_vp9"
+ */
+function stripExtension(filename) {
+  if (!filename) return 'video';
+  return filename.replace(/\.[^/.]+$/, '');
+}
+
 export default function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [videoInfo, setVideoInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savedBitrate, setSavedBitrate] = useState(null);
+  const [copiedCmd, setCopiedCmd] = useState(null); // 'pass1' | 'pass2' | null
 
   // Load previously saved bitrate on mount
   useEffect(() => {
@@ -291,6 +312,76 @@ export default function App() {
             <Text style={styles.savedBitrateValue}>{savedBitrate}</Text>
           </View>
         )}
+
+        {/* FFmpeg Commands Section */}
+        {videoInfo && selectedFile && (() => {
+          const kbps = extractKbps(videoInfo.resolvedBitrateStr);
+          const baseName = stripExtension(selectedFile.name);
+          const filePath = selectedFile.name; // using filename as path (Android)
+          if (!kbps) return null;
+
+          const pass1 = `ffmpeg -y -i ${filePath} -c:v libx264 -b:v ${kbps}k -pass 1 -an -f null /dev/null`;
+          const pass2 = `ffmpeg -i ${filePath} -c:v libx264 -b:v ${kbps}k -pass 2 -c:a copy h264_${baseName}.mp4`;
+
+          const copyToClipboard = (text, key) => {
+            Clipboard.setString(text);
+            setCopiedCmd(key);
+            setTimeout(() => setCopiedCmd(null), 2000);
+          };
+
+          return (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>⚡ FFmpeg Commands</Text>
+              <Text style={styles.ffmpegHint}>
+                Codificação 2-pass · libx264 · {kbps} kb/s
+              </Text>
+
+              {/* Pass 1 */}
+              <View style={styles.cmdBlock}>
+                <View style={styles.cmdHeader}>
+                  <Text style={styles.cmdPassLabel}>PASS 1</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.copyBtn,
+                      copiedCmd === 'pass1' && styles.copyBtnActive,
+                    ]}
+                    onPress={() => copyToClipboard(pass1, 'pass1')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.copyBtnText}>
+                      {copiedCmd === 'pass1' ? '✅ Copiado!' : '📋 Copiar'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.cmdBox}>
+                  <Text style={styles.cmdText} selectable>{pass1}</Text>
+                </View>
+              </View>
+
+              {/* Pass 2 */}
+              <View style={[styles.cmdBlock, { marginTop: 14 }]}>
+                <View style={styles.cmdHeader}>
+                  <Text style={styles.cmdPassLabel}>PASS 2</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.copyBtn,
+                      copiedCmd === 'pass2' && styles.copyBtnActive,
+                    ]}
+                    onPress={() => copyToClipboard(pass2, 'pass2')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.copyBtnText}>
+                      {copiedCmd === 'pass2' ? '✅ Copiado!' : '📋 Copiar'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.cmdBox}>
+                  <Text style={styles.cmdText} selectable>{pass2}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
       </ScrollView>
     </View>
   );
@@ -501,5 +592,61 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+
+  // FFmpeg Commands
+  ffmpegHint: {
+    color: '#5a7aa5',
+    fontSize: 12,
+    marginBottom: 14,
+    fontStyle: 'italic',
+  },
+  cmdBlock: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1e2d4a',
+  },
+  cmdHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0d1624',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  cmdPassLabel: {
+    color: '#ffd54f',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  copyBtn: {
+    backgroundColor: '#1a3a5c',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2a5a8c',
+  },
+  copyBtnActive: {
+    backgroundColor: '#1a3a1a',
+    borderColor: '#2a6a2a',
+  },
+  copyBtnText: {
+    color: '#7ab8e8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cmdBox: {
+    backgroundColor: '#0a0f1a',
+    padding: 14,
+  },
+  cmdText: {
+    color: '#c8f7c5',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    lineHeight: 20,
   },
 });
