@@ -342,6 +342,7 @@ export default function App() {
 
           const pass1 = `ffmpeg -y -i "${filePath}" -c:v libx264 -b:v ${kbps}k -pass 1 -an -f null /dev/null`;
           const pass2 = `ffmpeg -i "${filePath}" -c:v libx264 -b:v ${kbps}k -pass 2 -c:a copy "h264_${baseName}.mp4"`;
+          const runCmd = `bash convert_${baseName.substring(0, 4)}.sh`;
 
           const copyToClipboard = (text, key) => {
             Clipboard.setString(text);
@@ -403,7 +404,7 @@ echo "🎉 Transcodificação concluída com sucesso!"
 echo "💾 Arquivo gerado: $OUTPUT_FILE"
 `;
 
-              const file = new File(Paths.cache, `convert_${baseName}.sh`);
+              const file = new File(Paths.cache, `convert_${baseName.substring(0, 4)}.sh`);
               file.write(scriptContent);
 
               const fileUri = file.uri;
@@ -483,6 +484,28 @@ echo "💾 Arquivo gerado: $OUTPUT_FILE"
               >
                 <Text style={styles.generateBtnText}>⚙️ Gerar Script Bash (.sh)</Text>
               </TouchableOpacity>
+
+              {/* Executar Script Comando */}
+              <View style={[styles.cmdBlock, { marginTop: 14 }]}>
+                <View style={styles.cmdHeader}>
+                  <Text style={styles.cmdPassLabel}>Executar Script</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.copyBtn,
+                      copiedCmd === 'bash' && styles.copyBtnActive,
+                    ]}
+                    onPress={() => copyToClipboard(runCmd, 'bash')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.copyBtnText}>
+                      {copiedCmd === 'bash' ? '✅ Copiado!' : '📋 Copiar'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.cmdBox}>
+                  <Text style={styles.cmdText} selectable>{runCmd}</Text>
+                </View>
+              </View>
             </View>
           );
         })()}
