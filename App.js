@@ -170,18 +170,19 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerIcon}>🎬</Text>
-        <Text style={styles.headerTitle}>Video Info</Text>
-        <Text style={styles.headerSubtitle}>Análise de metadados de vídeo</Text>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerIcon}>🎬</Text>
+          <Text style={styles.headerTitle}>Video Info</Text>
+          <Text style={styles.headerSubtitle}>Análise de metadados de vídeo</Text>
+        </View>
+
+        <View style={styles.mainContent}>
         {/* Base Path Input */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📂 Caminho Base (FFmpeg)</Text>
@@ -339,8 +340,8 @@ export default function App() {
           const filePath = `${basePath}${selectedFile.name}`;
           if (!kbps) return null;
 
-          const pass1 = `ffmpeg -y -i ${filePath} -c:v libx264 -b:v ${kbps}k -pass 1 -an -f null /dev/null`;
-          const pass2 = `ffmpeg -i ${filePath} -c:v libx264 -b:v ${kbps}k -pass 2 -c:a copy h264_${baseName}.mp4`;
+          const pass1 = `ffmpeg -y -i "${filePath}" -c:v libx264 -b:v ${kbps}k -pass 1 -an -f null /dev/null`;
+          const pass2 = `ffmpeg -i "${filePath}" -c:v libx264 -b:v ${kbps}k -pass 2 -c:a copy "h264_${baseName}.mp4"`;
 
           const copyToClipboard = (text, key) => {
             Clipboard.setString(text);
@@ -367,7 +368,7 @@ if ! command -v ffmpeg &> /dev/null; then
     echo "Por favor, instale o ffmpeg e tente novamente."
     exit 1
 fi
-
+cd ~/storage/downloads
 echo "🎬 Iniciando processo de transcodificação para $VIDEO_FILE..."
 echo "⚙️ Configuração: libx264, Bitrate: $BITRATE"
 echo ""
@@ -485,6 +486,7 @@ echo "💾 Arquivo gerado: $OUTPUT_FILE"
             </View>
           );
         })()}
+        </View>
       </ScrollView>
     </View>
   );
@@ -525,8 +527,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
     paddingBottom: 40,
+  },
+  mainContent: {
+    padding: 20,
   },
   card: {
     backgroundColor: '#131d30',
